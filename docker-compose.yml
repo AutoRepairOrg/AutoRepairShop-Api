@@ -1,28 +1,10 @@
 services:
-  sqlserver:
-    image: mcr.microsoft.com/mssql/server:2022-latest
-    container_name: autorepairshop-sql
-    environment:
-      SA_PASSWORD: ${DB_PASSWORD}
-      ACCEPT_EULA: "Y"
-    ports:
-      - "1433:1433"
-    volumes:
-      - autorepairshop-sql-data:/var/opt/mssql
-    healthcheck:
-      test: ["CMD-SHELL", "bash -c '>/dev/tcp/localhost/1433'"]
-      interval: 10s
-      timeout: 5s
-      retries: 15
-
   api:
     build:
       context: .
       dockerfile: src/AutoRepairShop.Api/Dockerfile
     container_name: autorepairshop-api
     depends_on:
-      sqlserver:
-        condition: service_healthy
       mailhog:
         condition: service_started
     ports:
@@ -30,12 +12,7 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Development
 
-      ConnectionStrings__DefaultConnection: >
-        Server=sqlserver,1433;
-        Database=AutoRepairShopDb;
-        User Id=sa;
-        Password=${DB_PASSWORD};
-        TrustServerCertificate=True
+      ConnectionStrings__DefaultConnection: ${DB_CONNECTION_STRING}
 
       JWT__KEY: ${JWT_KEY}
       JWT__ISSUER: ${JWT_ISSUER}
@@ -54,6 +31,3 @@ services:
     ports:
       - "1025:1025"
       - "8025:8025"
-
-volumes:
-  autorepairshop-sql-data:
