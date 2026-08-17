@@ -64,22 +64,22 @@ builder.Configuration
 
 
 // DbContext
-//builder.Services.AddDbContext<AppDbContext>(options =>
-//    options.UseSqlServer(
-//        builder.Configuration.GetConnectionString("DefaultConnection"),
-//        o => o.EnableRetryOnFailure()
-//    )
-//);
-
-var host = Environment.GetEnvironmentVariable("DB_HOST") ?? "localhost";
-var port = Environment.GetEnvironmentVariable("DB_PORT") ?? "1433";
-var db = Environment.GetEnvironmentVariable("DB_NAME") ?? "AutoRepairShopDb";
-var pass = Environment.GetEnvironmentVariable("SA_PASSWORD") ?? "YourStrong@Passw0rd";
-
-var conn = $"Server={host},{port};Database={db};User Id=sa;Password={pass};TrustServerCertificate=True";
-
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseSqlServer(conn));
+    options.UseSqlServer(
+        builder.Configuration.GetConnectionString("DefaultConnection"),
+        o => o.EnableRetryOnFailure()
+    )
+);
+
+//var host = Environment.GetEnvironmentVariable("DB_HOST") ?? "localhost";
+//var port = Environment.GetEnvironmentVariable("DB_PORT") ?? "1433";
+//var db = Environment.GetEnvironmentVariable("DB_NAME") ?? "AutoRepairShopDb";
+//var pass = Environment.GetEnvironmentVariable("SA_PASSWORD") ?? "YourStrong@Passw0rd";
+
+//var conn = $"Server={host},{port};Database={db};User Id=sa;Password={pass};TrustServerCertificate=True";
+
+//builder.Services.AddDbContext<AppDbContext>(options =>
+//    options.UseSqlServer(conn));
 
 // AutoMapper
 builder.Services.AddAutoMapper(typeof(MapperProfile).Assembly);
