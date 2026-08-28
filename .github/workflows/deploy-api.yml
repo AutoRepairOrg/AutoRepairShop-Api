@@ -54,3 +54,17 @@ jobs:
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
         aws-region: us-east-1
+
+    - name: Update kubeconfig
+      run: |
+        aws eks update-kubeconfig --name autorepairshop-eks --region us-east-1
+
+    - name: Deploy to Kubernetes    # <-- AQUI! EDITE ESTA SEÇÃO
+      run: |
+        kubectl apply -f https://raw.githubusercontent.com/AutoRepairOrg/AutoRepairShop-Kubernetes/master/k8s/namespace.yaml
+        kubectl apply -f https://raw.githubusercontent.com/AutoRepairOrg/AutoRepairShop-Kubernetes/master/k8s/api-configmap.yaml
+        kubectl apply -f https://raw.githubusercontent.com/AutoRepairOrg/AutoRepairShop-Kubernetes/master/k8s/api-secrets.yaml
+        kubectl apply -f https://raw.githubusercontent.com/AutoRepairOrg/AutoRepairShop-Kubernetes/master/k8s/api-deployment.yaml
+        kubectl apply -f https://raw.githubusercontent.com/AutoRepairOrg/AutoRepairShop-Kubernetes/master/k8s/api-service-nlb.yaml
+        kubectl rollout status deployment/api -n oficina
+        kubectl get service api-nlb -n oficina 
