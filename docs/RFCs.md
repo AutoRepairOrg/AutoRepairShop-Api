@@ -482,6 +482,42 @@ Precisamos escolher a plataforma de deploy para a aplicação .NET principal. O 
 4. **Escalabilidade:** HPA + Cluster Autoscaler prontos para uso
 5. **Multi-AZ:** Alta disponibilidade nativa
 6. **Comunidade:** Kubernetes é padrão da indústria, facilita contratação
+
+### Consequências
+
+**Positivas:**
+- Atende 100% requisitos do Tech Challenge
+- Alta disponibilidade (Multi-AZ)
+- Auto-scaling automático (HPA)
+- Facilita CI/CD (rolling updates)
+- Portabilidade (pode migrar para GKE/AKS)
+
+**Negativas:**
+- Custo: $73 control plane + $15-30 nodes = $88-103/mês
+- Curva de aprendizado Kubernetes
+- Complexidade operacional (comparado a ECS)
+
+### Plano de Custos
+
+**Otimizações:**
+1. Usar Spot Instances para nodes (economia de 70%)
+2. Cluster Autoscaler para desligar nodes ociosos
+3. Avaliar Fargate para workloads esporádicos (futuro)
+
+### Plano de Monitoramento
+
+**Métricas:**
+- Pod CPU/Memory utilization (CloudWatch Container Insights)
+- HPA events (scaling up/down)
+- Node health (kubelet status)
+- Deployment rollout status
+
+### Métricas de Sucesso
+
+- Deployment rollout < 5 minutos
+- Zero downtime em deploys (rolling update)
+- HPA escala em < 60 segundos
+
 ---
 
 ## Histórico de RFCs
@@ -497,3 +533,4 @@ Precisamos escolher a plataforma de deploy para a aplicação .NET principal. O 
 
 **Última atualização:** Agosto 2026  
 **Autores:** Dhiulia da Silva, Mateus Pinheiro
+```
