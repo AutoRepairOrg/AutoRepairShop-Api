@@ -177,7 +177,7 @@ Precisamos escolher um banco de dados gerenciado para armazenar dados da oficina
 
 ### Plano de Monitoramento
 
-- Alertas CloudWatch quando storage > 70% (7GB)
+- Alertas Datadog
 - Revisão trimestral de custos
 - Benchmark de performance (latência < 50ms para 95% das queries)
 
@@ -375,7 +375,7 @@ Precisamos implementar autenticação segura para proteger as APIs do sistema. O
    - Rate limiting: 100 requests/minuto por IP (API Gateway)
 
 3. **Monitoramento:**
-   - CloudWatch Logs: Todas as tentativas de login
+   - Logs: Todas as tentativas de login
    - Alertas: Taxa de falha > 10%
    - Métricas: Latência p95 < 200ms
 
@@ -478,7 +478,7 @@ Precisamos escolher a plataforma de deploy para a aplicação .NET principal. O 
 
 1. **Requisito obrigatório:** Tech Challenge exige Kubernetes
 2. **Gerenciamento:** AWS cuida do control plane (HA, upgrades, security patches)
-3. **Integração:** Nativa com NLB, IAM, CloudWatch, Secrets Manager
+3. **Integração:** Nativa com NLB, IAM, Secrets Manager
 4. **Escalabilidade:** HPA + Cluster Autoscaler prontos para uso
 5. **Multi-AZ:** Alta disponibilidade nativa
 6. **Comunidade:** Kubernetes é padrão da indústria, facilita contratação
@@ -507,7 +507,7 @@ Precisamos escolher a plataforma de deploy para a aplicação .NET principal. O 
 ### Plano de Monitoramento
 
 **Métricas:**
-- Pod CPU/Memory utilization (CloudWatch Container Insights)
+- Pod CPU/Memory utilization
 - HPA events (scaling up/down)
 - Node health (kubelet status)
 - Deployment rollout status
