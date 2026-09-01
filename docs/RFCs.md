@@ -533,4 +533,3 @@ Precisamos escolher a plataforma de deploy para a aplicação .NET principal. O 
 
 **Última atualização:** Agosto 2026  
 **Autores:** Dhiulia da Silva, Mateus Pinheiro
-```
