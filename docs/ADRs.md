@@ -343,10 +343,9 @@ var secret = JsonSerializer.Deserialize<JwtSecret>(response.SecretString);
 - 100% de secrets sensíveis no Secrets Manager
 - Latência de GetSecretValue < 100ms
 - Zero vazamentos de secrets (monitorado por git-secrets)
-
 ---
 
-## ADR-004: Estratégia de Logs com CloudWatch
+## ADR-004: Estratégia de Monitoramento com Datadog
 
 **Status:** ACEITO  
 **Data:** 2026-08-07  
@@ -354,177 +353,260 @@ var secret = JsonSerializer.Deserialize<JwtSecret>(response.SecretString);
 
 ### Contexto
 
-Precisamos coletar, centralizar e analisar logs de todos os componentes (Lambda, EKS, RDS) para troubleshooting e monitoramento.
+Precisamos monitorar a saúde, performance e disponibilidade de todos os componentes da aplicação (Lambda, EKS, RDS, API Gateway) em um único dashboard centralizado.
 
 ### Decisão
 
-Usar **AWS CloudWatch Logs** como solução de logging centralizado.
+Usar **Datadog** como solução completa de monitoramento (APM, Logs, Metrics, Traces).
 
 ### Justificativa
 
-1. **Integração nativa:** Lambda, EKS, RDS já enviam logs automaticamente
-2. **Custo:** $0.50/GB ingestão + $0.03/GB armazenamento (mais barato que Datadog Logs)
-3. **Retention:** Configurável por log group (1 dia a 10 anos)
-4. **Queries:** CloudWatch Logs Insights (SQL-like)
-5. **Alertas:** CloudWatch Alarms baseados em métricas de logs
+1. **APM completo:** Application Performance Monitoring com traces distribuídos
+2. **Dashboards prontos:** Templates para Kubernetes, Lambda, RDS
+3. **Alertas inteligentes:** Machine learning para detecção de anomalias
+4. **Logs + Metrics + Traces:** Tudo correlacionado em uma única plataforma
+5. **Integração .NET:** SDK nativo, auto-instrumentation
+6. **Requisito Tech Challenge:** Monitoramento de latência, CPU, memória, healthchecks obrigatório
 
-### Estrutura de Log Groups
+### Componentes Monitorados
 
-**Lambda Functions:**
-- `/aws/lambda/autorepair-login`
-- `/aws/lambda/autorepair-authorizer`
-- Retention: 7 dias
-- Filtros: ERROR, WARN
+**1. EKS Pods (API .NET)**
+- CPU, Memória, Disk I/O
+- Request rate, latência (p50, p95, p99)
+- Taxa de erro (4xx, 5xx)
+- Traces distribuídos (request → database)
 
-**EKS Pods:**
-- `/aws/eks/autorepairshop-eks/cluster`
-- `/aws/containerinsights/autorepairshop-eks/application`
-- Retention: 14 dias
-- Formato: JSON estruturado
+**2. AWS Lambda**
+- Invocações, erros, throttles
+- Cold starts
+- Duração (p50, p95, p99)
+- Memória utilizada
 
-**RDS:**
-- `/aws/rds/instance/autorepair-sqlserver/error`
-- `/aws/rds/instance/autorepair-sqlserver/slowquery`
-- Retention: 30 dias
+**3. RDS SQL Server**
+- CPU, Memória, IOPS
+- Conexões ativas
+- Slow queries (> 1 segundo)
+- Deadlocks, lock waits
 
-### Formato de Logs Estruturados
+**4. API Gateway**
+- Request count
+- Latência (integração, total)
+- Taxa de erro (4xx, 5xx)
+- Cache hit/miss
 
-**JSON Schema:**
-```json
-{
-  "timestamp": "2026-08-07T10:30:00.123Z",
-  "level": "INFO|WARN|ERROR",
-  "message": "Customer authenticated successfully",
-  "context": {
-    "customerId": "uuid",
-    "requestId": "abc123",
-    "ipAddress": "203.0.113.42",
-    "userAgent": "Mozilla/5.0...",
-    "latencyMs": 145
-  },
-  "exception": {
-    "type": "SqlException",
-    "message": "Connection timeout",
-    "stackTrace": "..."
-  }
-}
-```
-
-**Níveis de log:**
-- **TRACE:** Detalhes internos (disabled em produção)
-- **DEBUG:** Informações de desenvolvimento
-- **INFO:** Eventos normais (login, criação de ordem)
-- **WARN:** Situações incomuns mas recuperáveis (retry bem-sucedido)
-- **ERROR:** Erros que requerem atenção (falha de autenticação, timeout DB)
-- **FATAL:** Erros críticos (aplicação crashou)
+**5. Kubernetes Cluster**
+- Node CPU/Memory
+- Pod restarts
+- HPA events
+- PVC usage
 
 ### Alternativas Consideradas
 
-**ELK Stack (Elasticsearch, Logstash, Kibana):**
-- Prós: Queries poderosas, visualizações ricas, open source
-- Contras: Custo de infra ($100+/mês), complexidade operacional, precisa gerenciar cluster
-- Decisão: Overkill para MVP, avaliar em Fase 3
+**CloudWatch (AWS nativo):**
+- Prós: Integração nativa AWS, sem custo adicional de agente, gratuito (básico)
+- Contras: Dashboards limitados, sem APM, sem traces distribuídos, queries limitadas
+- Decisão: Inadequado para monitoramento avançado exigido pelo Tech Challenge
 
-**Datadog Logs:**
-- Prós: APM integrado, dashboards bonitos, alertas avançados
-- Contras: Custo elevado ($0.10/GB ingestão + $1.27/milhão eventos), vendor lock-in
-- Decisão: Usar Datadog apenas para métricas/APM, não logs
+**Prometheus + Grafana:**
+- Prós: Open source, customizável, sem vendor lock-in
+- Contras: Precisa hospedar (custo infra), configuração complexa, sem APM out-of-box
+- Decisão: Muita complexidade operacional para MVP
 
-**Splunk:**
-- Prós: Líder de mercado, features avançadas (SIEM, correlação)
-- Contras: Custo proibitivo ($150+/GB), complexidade, enterprise-only
-- Decisão: Não adequado para startup/MVP
+**New Relic:**
+- Prós: APM robusto, dashboards bonitos, machine learning
+- Contras: Custo similar ao Datadog, menos integração com AWS, menos popular no mercado brasileiro
+- Decisão: Datadog tem melhor integração AWS e maior adoção
 
-**Loki (Grafana):**
-- Prós: Leve, compatível com Prometheus, custo baixo
-- Contras: Menos features que CloudWatch Insights, precisa hospedar
-- Decisão: Avaliar em Fase 2 se Grafana for adotado
+**Elastic APM + Kibana:**
+- Prós: Open source, integrado com ELK stack
+- Contras: Precisa gerenciar cluster Elasticsearch, complexidade alta
+- Decisão: Overkill para MVP
+
+### Decisão
+
+**Escolhido:** Datadog
 
 ### Implementação
 
-**Lambda (.NET):**
+**1. Instalação no EKS:**
+```bash
+# Helm chart oficial Datadog
+helm repo add datadog https://helm.datadoghq.com
+helm install datadog-agent datadog/datadog \
+  --set datadog.apiKey=$DD_API_KEY \
+  --set datadog.site=datadoghq.com \
+  --set datadog.logs.enabled=true \
+  --set datadog.apm.enabled=true \
+  --set datadog.processAgent.enabled=true \
+  --set datadog.kubeStateMetricsEnabled=true
+```
+
+**2. Instrumentação .NET (API):**
 ```csharp
-ILogger<Function> logger;
+// Startup.cs
+services.AddDatadogTracing();
+services.AddDatadogMetrics();
 
-logger.LogInformation("Customer {CustomerId} authenticated", customerId);
-logger.LogError(ex, "Failed to generate JWT for customer {CustomerId}", customerId);
+// Program.cs
+var logger = LoggerFactory.Create(builder => {
+    builder.AddDatadogLogger(options => {
+        options.ApiKey = Environment.GetEnvironmentVariable("DD_API_KEY");
+    });
+});
 ```
 
-**EKS Pod (.NET):**
-```csharp
-// Serilog + CloudWatch sink
-Log.Logger = new LoggerConfiguration()
-    .WriteTo.Console(new JsonFormatter())
-    .WriteTo.AWSSerilog(configuration)
-    .CreateLogger();
-
-Log.Information("ServiceOrder {OrderId} created for customer {CustomerId}", orderId, customerId);
+**3. Lambda Monitoring:**
+```bash
+# Layer Datadog para .NET
+aws lambda update-function-configuration \
+  --function-name autorepair-login \
+  --layers arn:aws:lambda:us-east-1:464622532012:layer:Datadog-Extension:latest
+  
+# Variáveis de ambiente
+DD_API_KEY=<api-key>
+DD_SITE=datadoghq.com
+DD_TRACE_ENABLED=true
 ```
 
-**CloudWatch Logs Insights Queries:**
+**4. RDS Integration:**
+```yaml
+# Datadog agent config
+instances:
+  - host: autorepair-sqlserver.cflewrgiz7x4.us-east-1.rds.amazonaws.com
+    port: 1433
+    username: datadog
+    password: <password>
+    database: AutoRepairShop
+    tags:
+      - env:production
+      - service:autorepair-db
+```
 
-**Top 10 erros:**
-```
-fields @timestamp, message, context.customerId
-| filter level = "ERROR"
-| stats count() by exception.type
-| sort count desc
-| limit 10
-```
+### Dashboards Configurados
 
-**Latência p95:**
-```
-fields @timestamp, context.latencyMs
-| filter ispresent(context.latencyMs)
-| stats pct(context.latencyMs, 95) as p95
-```
+**1. Application Overview:**
+- Request rate (req/s)
+- Latência (p50, p95, p99)
+- Error rate (%)
+- Apdex score
+
+**2. Infrastructure:**
+- Kubernetes nodes (CPU, Memory, Disk)
+- Pods por namespace
+- Container restarts
+- Network I/O
+
+**3. Database:**
+- RDS CPU, Memory, IOPS
+- Conexões ativas
+- Slow queries (> 1s)
+- Query execution time
+
+**4. Lambda:**
+- Invocações por função
+- Cold starts
+- Erros e timeouts
+- Custo estimado
+
+**5. Custom Business Metrics:**
+- Ordens de serviço criadas/hora
+- Clientes autenticados/hora
+- Taxa de conversão
+- Tempo médio de processamento
+
+### Alertas Configurados
+
+**Critical (PagerDuty/SMS):**
+- Error rate > 5% por 5 minutos
+- Latência p95 > 2 segundos por 10 minutos
+- RDS CPU > 90% por 5 minutos
+- Lambda errors > 10% por 3 minutos
+- Kubernetes node down
+
+**Warning (Slack/E-mail):**
+- Latência p95 > 500ms por 15 minutos
+- Error rate > 2% por 10 minutos
+- HPA max replicas atingido
+- RDS disk > 70%
+- Memory usage > 80%
+
+**Info (Slack apenas):**
+- Deploy realizado (via webhook)
+- HPA scaling event
+- Slow query detectado (> 5s)
+
+### Métricas de Sucesso (SLOs)
+
+**Latência:**
+- p95 < 200ms (API endpoints)
+- p95 < 100ms (Lambda Authorizer)
+- p95 < 500ms (database queries)
+
+**Disponibilidade:**
+- Uptime > 99.5% (mensal)
+- Error rate < 1% (4xx+5xx)
+
+**Performance:**
+- Apdex score > 0.9
+- Zero timeouts em Lambda
 
 ### Consequências
 
 **Positivas:**
-- Logs centralizados de todos os componentes
-- Queries SQL-like para análise
-- Integração nativa AWS (zero configuração)
-- Custo controlado com retention policies
+- Visibilidade completa da aplicação (end-to-end tracing)
+- Detecção proativa de problemas (anomaly detection)
+- Troubleshooting rápido (logs + traces correlacionados)
+- Dashboards prontos para demonstração no vídeo do Tech Challenge
+- Atende 100% requisito de monitoramento (latência, CPU, memória, healthchecks, alertas)
 
 **Negativas:**
-- CloudWatch Insights menos poderoso que Elasticsearch
-- Custo cresce com volume ($0.50/GB)
-- Sem visualizações prontas (precisa criar queries manualmente)
+- Custo: $15-31/mês/host (free tier: 5 hosts)
+- Vendor lock-in (mitigado por usar OpenTelemetry como fallback)
+- Overhead de agente nos pods (~50MB RAM)
 
 ### Plano de Custos
 
-**Estimativa mensal:**
-- Lambda logs: 1 GB/mês = $0.50
-- EKS logs: 5 GB/mês = $2.50
-- RDS logs: 2 GB/mês = $1.00
-- Queries: 100 queries/mês = $0.50
-- **Total:** ~$5/mês
+**Free Tier:**
+- 5 hosts gratuitos
+- APM: 1 host
+- Logs: 15 dias retenção
+- Metrics: 1 ano retenção
+
+**Estimativa mensal (após free tier):**
+- Infrastructure monitoring: 3 hosts × $15 = $45/mês
+- APM: 3 hosts × $31 = $93/mês
+- Logs: 5 GB × $0.10 = $0.50/mês
+- **Total:** ~$140/mês (ou $0 se ficar no free tier)
 
 **Otimizações:**
-- Filtrar logs DEBUG em produção
-- Retention curta para logs INFO (7 dias)
-- Retention longa para logs ERROR (30 dias)
-- Exportar logs antigos para S3 ($0.023/GB)
+- Usar apenas Infrastructure + APM (skip Logs)
+- Filtrar métricas custom desnecessárias
+- Reduzir retenção de logs (7 dias)
 
-### Alertas Configurados
+### Roadmap
 
-**Critical:**
-- Taxa de erro > 5% (SNS → E-mail)
-- Lambda timeout > 3x em 5 minutos
-- RDS connection pool esgotado
+**Fase 1 (MVP):**
+- Dashboards básicos (Application, Infrastructure, Database)
+- Alertas críticos (error rate, latência)
+- APM traces para troubleshooting
 
-**Warning:**
-- Latência p95 > 500ms
-- Taxa de retry > 10%
-- Disco RDS > 70%
+**Fase 2:**
+- Synthetic monitoring (testes automatizados de ponta a ponta)
+- RUM (Real User Monitoring) para frontend
+- Incident management integration (PagerDuty)
+
+**Fase 3:**
+- Anomaly detection com ML
+- SLO tracking automático
+- Cost attribution por serviço
 
 ### Métricas de Sucesso
 
-- 100% dos componentes enviando logs para CloudWatch
+- 100% dos componentes enviando métricas
+- Dashboard principal atualizado em tempo real (< 10s delay)
+- Tempo médio de detecção de incidentes < 2 minutos
 - Tempo médio de troubleshooting < 15 minutos
-- Zero perda de logs
-- Custo de logs < $10/mês
+- Zero blind spots (todos os componentes visíveis)
 
 ---
 
