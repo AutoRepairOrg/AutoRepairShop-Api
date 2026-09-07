@@ -90,12 +90,12 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
-          aws-region: ${{ env.AWS_REGION }}
+          aws-region: us-east-1
  
       - name: Update kubeconfig (EKS)
         run: |
-          aws eks update-kubeconfig --name "${EKS_CLUSTER}" --region "${AWS_REGION}"
-          kubectl get nodes
+          aws eks update-kubeconfig --name autorepairshop-eks --region us-east-1
+          kubectl cluster-info
  
       - name: Create image pull secret
         run: |
