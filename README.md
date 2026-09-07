@@ -2,7 +2,7 @@
 
 Projeto backend desenvolvido como **Tech Challenge**, simulando o sistema de gestão de uma oficina mecânica, com foco em **Ordem de Serviço (Service Order)**, domínio rico e boas práticas de arquitetura.
 
----
+--- 
 ## 📐 Arquitetura
 
 O projeto segue uma **Clean Architecture simplificada**, com princípios de **DDD (Domain-Driven Design)** e separação clara de responsabilidades:
