@@ -118,7 +118,7 @@ jobs:
           kubectl -n "${K8S_NAMESPACE}" create secret docker-registry ghcr-secret \
             --docker-server=ghcr.io \
             --docker-username="${{ secrets.GHCR_USERNAME }}" \
-            --docker-password="${{ secrets.GHCR_PAT }}" \
+            --docker-password="${{ secrets.GHCR_TOKEN }}" \
             --docker-email="${{ secrets.GHCR_EMAIL }}" \
             --dry-run=client -o yaml | kubectl apply -f -
  
@@ -315,7 +315,7 @@ jobs:
           kubectl -n "${K8S_NAMESPACE}" create secret docker-registry ghcr-secret \
             --docker-server=ghcr.io \
             --docker-username="${{ secrets.GHCR_USERNAME }}" \
-            --docker-password="${{ secrets.GHCR_PAT }}" \
+            --docker-password="${{ secrets.GHCR_TOKEN }}" \
             --docker-email="${{ secrets.GHCR_EMAIL }}" \
             --dry-run=client -o yaml | kubectl apply -f -
  
