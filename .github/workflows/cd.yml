@@ -1,62 +1,54 @@
 name: CD
-
+ 
 on:
   workflow_dispatch:
   push:
     branches:
       - development
       - master
-
+ 
 permissions:
   contents: read
   packages: write
-
+ 
 env:
   IMAGE_NAME: autorepairshop-api
-
+ 
 jobs:
   validate:
-    runs-on:
-      - self-hosted
-      - linux
-      - x64
-      - minikube
-
+    runs-on: ubuntu-latest
+ 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
+ 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         env:
           DOTNET_INSTALL_DIR: ${{ runner.temp }}/.dotnet
         with:
           dotnet-version: 8.0.x
-
+ 
       - name: Restore
         run: dotnet restore AutoRepairShop.sln
-
+ 
       - name: Build
         run: dotnet build AutoRepairShop.sln --configuration Release --no-restore
-
+ 
       - name: Test
         run: dotnet test AutoRepairShop.sln --configuration Release --no-build --verbosity normal
-
+ 
   publish-image:
     needs: validate
-    runs-on:
-      - self-hosted
-      - linux
-      - x64
-      - minikube
+    runs-on: ubuntu-latest
     outputs:
       owner_lower: ${{ steps.image-meta.outputs.owner_lower }}
       image: ${{ steps.image-meta.outputs.image }}
-
+ 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
+ 
       - name: Set image metadata
         id: image-meta
         run: |
@@ -64,14 +56,14 @@ jobs:
           IMAGE="ghcr.io/${OWNER_LOWER}/${IMAGE_NAME}:${GITHUB_SHA}"
           echo "owner_lower=${OWNER_LOWER}" >> "$GITHUB_OUTPUT"
           echo "image=${IMAGE}" >> "$GITHUB_OUTPUT"
-
+ 
       - name: Log in to GHCR
         uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-
+ 
       - name: Build and push Docker image
         uses: docker/build-push-action@v7
         with:
@@ -81,43 +73,43 @@ jobs:
           tags: |
             ${{ steps.image-meta.outputs.image }}
             ghcr.io/${{ steps.image-meta.outputs.owner_lower }}/${{ env.IMAGE_NAME }}:latest
-
+ 
   deploy-development:
     if: github.ref == 'refs/heads/development'
     needs: publish-image
-    runs-on:
-      - self-hosted
-      - linux
-      - x64
-      - minikube
+    runs-on: ubuntu-latest
     environment: development
     env:
       K8S_NAMESPACE: oficina
-      MINIKUBE_PROFILE: dev
       TF_VAR_environment: development
-
+ 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
+ 
       - name: Setup kubectl
         uses: azure/setup-kubectl@v4.0.0
-
+ 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: latest
           terraform_wrapper: false
-
-      - name: Ensure minikube dev cluster
+ 
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: us-east-1
+ 
+      - name: Update kubeconfig (EKS)
         run: |
-          if ! minikube status --profile "${MINIKUBE_PROFILE}" >/dev/null 2>&1; then
-            minikube start --profile "${MINIKUBE_PROFILE}" --driver=docker
-          fi
-          kubectl config use-context "${MINIKUBE_PROFILE}"
+          aws eks update-kubeconfig --name autorepairshop-eks --region us-east-1
           kubectl cluster-info
           kubectl get nodes
-
+ 
       - name: Create image pull secret
         run: |
           if ! kubectl get namespace "${K8S_NAMESPACE}" >/dev/null 2>&1; then
@@ -129,30 +121,29 @@ jobs:
             --docker-password="${{ secrets.GHCR_PAT }}" \
             --docker-email="${{ secrets.GHCR_EMAIL }}" \
             --dry-run=client -o yaml | kubectl apply -f -
-
-      # moved creation of k8s application secrets to after Terraform apply
-
+ 
       - name: Terraform Init
         run: cd infra && terraform init
-
+ 
       - name: Fix provider permissions
         run: |
           if [ -d infra/.terraform ]; then
             find infra/.terraform -type f -name 'terraform-provider-*' -exec chmod +x {} \; || true
           fi
+ 
       - name: Terraform Plan
         run: cd infra && terraform plan -out=tfplan
-
+ 
       - name: Terraform Apply
         run: cd infra && terraform apply -auto-approve tfplan
-
+ 
       - name: Ensure sqlserver-secret
         run: |
           kubectl -n "${K8S_NAMESPACE}" create secret generic sqlserver-secret \
             --from-literal=SA_PASSWORD="${{ secrets.DB_PASSWORD }}" \
             --from-literal=DB_NAME="AutoRepairShopDb" \
             --dry-run=client -o yaml | kubectl apply -f -
-
+ 
       - name: Ensure api-secrets
         run: |
           kubectl -n "${K8S_NAMESPACE}" create secret generic api-secrets \
@@ -161,14 +152,14 @@ jobs:
             --from-literal=Jwt__Audience="${{ secrets.JWT_AUDIENCE }}" \
             --from-literal=Jwt__ExpiresInMinutes="${{ secrets.JWT_EXPIRES_IN_MINUTES }}" \
             --dry-run=client -o yaml | kubectl apply -f -
-
+ 
       - name: Create dev-suffixed workloads
         run: |
           if kubectl -n "${K8S_NAMESPACE}" get deployment sqlserver >/dev/null 2>&1; then
             kubectl -n "${K8S_NAMESPACE}" scale deployment sqlserver --replicas=0
           fi
           kubectl -n "${K8S_NAMESPACE}" wait --for=delete pod -l app=sqlserver --timeout=120s || true
-
+ 
           kubectl -n "${K8S_NAMESPACE}" apply -f - <<'EOF'
           apiVersion: apps/v1
           kind: Deployment
@@ -207,7 +198,7 @@ jobs:
                       - secretRef:
                           name: api-secrets
           EOF
-
+ 
           kubectl -n "${K8S_NAMESPACE}" apply -f - <<'EOF'
           apiVersion: apps/v1
           kind: Deployment
@@ -244,15 +235,16 @@ jobs:
                     persistentVolumeClaim:
                       claimName: sqlserver-pvc
           EOF
-
+ 
           kubectl -n "${K8S_NAMESPACE}" patch service api --type merge -p '{"spec":{"selector":{"app":"api-dev"}}}'
           kubectl -n "${K8S_NAMESPACE}" patch service sqlserver --type merge -p '{"spec":{"selector":{"app":"sqlserver-dev"}}}'
           kubectl -n "${K8S_NAMESPACE}" patch hpa api-hpa --type merge -p '{"spec":{"scaleTargetRef":{"name":"api-dev"}}}'
           kubectl -n "${K8S_NAMESPACE}" delete deployment api --ignore-not-found=true
-
+ 
       - name: Install metrics-server
         run: |
           kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+ 
       - name: Patch metrics-server insecure tls
         run: |
           kubectl patch deployment metrics-server \
@@ -265,55 +257,56 @@ jobs:
                 "value": "--kubelet-insecure-tls"
               }
             ]'
+ 
       - name: Wait metrics-server
         run: |
           kubectl rollout status deployment metrics-server -n kube-system
-
+ 
       - name: Update API image
         run: |
           kubectl -n "${K8S_NAMESPACE}" set image deployment/api-dev api="${{ needs.publish-image.outputs.image }}"
-
+ 
       - name: Wait for deployments
         run: |
           kubectl -n "${K8S_NAMESPACE}" rollout status deployment/sqlserver-dev --timeout=60s
           kubectl -n "${K8S_NAMESPACE}" rollout status deployment/api-dev --timeout=60s
-
+ 
   deploy-production:
     if: github.ref == 'refs/heads/master'
     needs: publish-image
-    runs-on:
-      - self-hosted
-      - linux
-      - x64
-      - minikube
+    runs-on: ubuntu-latest
     environment: production
     env:
       K8S_NAMESPACE: oficina
-      MINIKUBE_PROFILE: prod
       TF_VAR_environment: production
-
+ 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
+ 
       - name: Setup kubectl
         uses: azure/setup-kubectl@v4.0.0
-
+ 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: latest
           terraform_wrapper: false
-
-      - name: Ensure minikube prod cluster
+ 
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: us-east-1
+ 
+      - name: Update kubeconfig (EKS)
         run: |
-          if ! minikube status --profile "${MINIKUBE_PROFILE}" >/dev/null 2>&1; then
-            minikube start --profile "${MINIKUBE_PROFILE}" --driver=docker
-          fi
-          kubectl config use-context "${MINIKUBE_PROFILE}"
+          aws eks update-kubeconfig --name autorepairshop-eks --region us-east-1
           kubectl cluster-info
           kubectl get nodes
-
+ 
       - name: Create image pull secret
         run: |
           if ! kubectl get namespace "${K8S_NAMESPACE}" >/dev/null 2>&1; then
@@ -325,29 +318,29 @@ jobs:
             --docker-password="${{ secrets.GHCR_PAT }}" \
             --docker-email="${{ secrets.GHCR_EMAIL }}" \
             --dry-run=client -o yaml | kubectl apply -f -
-
-      # moved creation of k8s application secrets to after Terraform apply
+ 
       - name: Terraform Init
         run: cd infra && terraform init
-
+ 
       - name: Fix provider permissions
         run: |
           if [ -d infra/.terraform ]; then
             find infra/.terraform -type f -name 'terraform-provider-*' -exec chmod +x {} \; || true
           fi
+ 
       - name: Terraform Plan
         run: cd infra && terraform plan -out=tfplan
-
+ 
       - name: Terraform Apply
         run: cd infra && terraform apply -auto-approve tfplan
-
+ 
       - name: Create SQL Server secret
         run: |
           kubectl -n "${K8S_NAMESPACE}" create secret generic sqlserver-secret \
             --from-literal=SA_PASSWORD="${{ secrets.DB_PASSWORD }}" \
             --from-literal=DB_NAME="AutoRepairShopDb" \
             --dry-run=client -o yaml | kubectl apply -f -
-
+ 
       - name: Ensure api-secrets
         run: |
           kubectl -n "${K8S_NAMESPACE}" create secret generic api-secrets \
@@ -356,10 +349,11 @@ jobs:
             --from-literal=Jwt__Audience="${{ secrets.JWT_AUDIENCE }}" \
             --from-literal=Jwt__ExpiresInMinutes="${{ secrets.JWT_EXPIRES_IN_MINUTES }}" \
             --dry-run=client -o yaml | kubectl apply -f -
-
+ 
       - name: Install metrics-server
         run: |
           kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+ 
       - name: Patch metrics-server insecure tls
         run: |
           kubectl patch deployment metrics-server \
@@ -372,14 +366,15 @@ jobs:
                 "value": "--kubelet-insecure-tls"
               }
             ]'
+ 
       - name: Wait metrics-server
         run: |
           kubectl rollout status deployment metrics-server -n kube-system
-
+ 
       - name: Update API image
         run: |
           kubectl -n "${K8S_NAMESPACE}" set image deployment/api api="${{ needs.publish-image.outputs.image }}"
-
+ 
       - name: Wait for deployments
         run: |
           kubectl -n "${K8S_NAMESPACE}" rollout status deployment/sqlserver --timeout=60s
