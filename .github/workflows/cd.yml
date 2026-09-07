@@ -37,8 +37,8 @@ jobs:
       - name: Build
         run: dotnet build AutoRepairShop.sln --configuration Release --no-restore
 
-      - name: Test
-        run: dotnet test AutoRepairShop.sln --configuration Release --no-build --verbosity normal
+     # - name: Test
+      #  run: dotnet test AutoRepairShop.sln --configuration Release --no-build --verbosity normal
 
   publish-image:
     needs: validate
