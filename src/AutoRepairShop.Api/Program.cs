@@ -71,10 +71,10 @@ builder.Configuration
   //  )
 //);
 
-var host = Environment.GetEnvironmentVariable("DB_HOST") ?? "localhost";
+var host = Environment.GetEnvironmentVariable("DB_HOST") ?? "sqlserver";
 var port = Environment.GetEnvironmentVariable("DB_PORT") ?? "1433";
 var db = Environment.GetEnvironmentVariable("DB_NAME") ?? "AutoRepairShopDb";
-var pass = Environment.GetEnvironmentVariable("SA_PASSWORD") ?? "YourStrong@Passw0rd";
+var pass = Environment.GetEnvironmentVariable("SA_PASSWORD") ?? "StrongPassword@123";
 
 var conn = $"Server={host},{port};Database={db};User Id=sa;Password={pass};TrustServerCertificate=True";
 
