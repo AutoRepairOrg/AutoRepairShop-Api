@@ -74,9 +74,10 @@ builder.Configuration
 var host = Environment.GetEnvironmentVariable("DB_HOST") ?? "sqlserver";
 var port = Environment.GetEnvironmentVariable("DB_PORT") ?? "1433";
 var db = Environment.GetEnvironmentVariable("DB_NAME") ?? "AutoRepairShopDb";
-var pass = Environment.GetEnvironmentVariable("SA_PASSWORD") ?? "StrongPassword@123";
+var user = Environment.GetEnvironmentVariable("DB_USER") ?? "sa";
+var pass = Environment.GetEnvironmentVariable("DB_PASSWORD") ?? "StrongPassword@123";
 
-var conn = $"Server={host},{port};Database={db};User Id=sa;Password={pass};TrustServerCertificate=True";
+var conn = $"Server={host},{port};Database={db};User Id={user};Password={pass};TrustServerCertificate=True";
 
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlServer(conn));
