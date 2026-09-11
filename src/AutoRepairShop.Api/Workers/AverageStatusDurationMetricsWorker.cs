@@ -9,16 +9,14 @@ public class AverageStatusDurationMetricsWorker(
     ILogger<AverageStatusDurationMetricsWorker> logger
 ) : BackgroundService
 {
-    private static readonly TimeSpan PublishInterval = TimeSpan.FromMinutes(1);
+    private static readonly TimeSpan PublishInterval = TimeSpan.FromSeconds(60);
 
-    private const string DiagnosisMetric = "autorepair.service_order.avg_duration.diagnosis";
-    private const string ExecutionMetric = "autorepair.service_order.avg_duration.execution";
-    private const string FinishedMetric = "autorepair.service_order.avg_duration.finished";
+    private const string MetricName = "service_order.avg_duration_seconds";
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         logger.LogInformation(
-            "Starting average status duration metrics publisher (interval: {Interval})",
+            "Starting service order status duration metrics publisher (interval: {Interval})",
             PublishInterval
         );
 
@@ -34,7 +32,7 @@ public class AverageStatusDurationMetricsWorker(
             }
             catch (Exception ex)
             {
-                logger.LogWarning(ex, "Failed to publish average status duration metrics to Datadog");
+                logger.LogWarning(ex, "Failed to publish service_order.avg_duration_seconds to Datadog");
             }
 
             try
@@ -56,13 +54,26 @@ public class AverageStatusDurationMetricsWorker(
 
         cancellationToken.ThrowIfCancellationRequested();
 
-        dogStatsd.Gauge(DiagnosisMetric, metrics.AverageInDiagnosisDuration.TotalSeconds);
-        dogStatsd.Gauge(ExecutionMetric, metrics.AverageInExecutionDuration.TotalSeconds);
-        dogStatsd.Gauge(FinishedMetric, metrics.AverageFinishedDuration.TotalSeconds);
+        dogStatsd.Gauge(
+            MetricName,
+            metrics.AverageInDiagnosisDuration.TotalSeconds,
+            tags: ["status:in_diagnosis"]
+        );
+        dogStatsd.Gauge(
+            MetricName,
+            metrics.AverageInExecutionDuration.TotalSeconds,
+            tags: ["status:in_execution"]
+        );
+        dogStatsd.Gauge(
+            MetricName,
+            metrics.AverageFinishedDuration.TotalSeconds,
+            tags: ["status:finished"]
+        );
         dogStatsd.Flush();
 
         logger.LogInformation(
-            "Published status duration metrics. Diagnosis={Diagnosis}s Execution={Execution}s Finished={Finished}s",
+            "Published {Metric}. in_diagnosis={Diagnosis}s in_execution={Execution}s finished={Finished}s",
+            MetricName,
             metrics.AverageInDiagnosisDuration.TotalSeconds,
             metrics.AverageInExecutionDuration.TotalSeconds,
             metrics.AverageFinishedDuration.TotalSeconds
