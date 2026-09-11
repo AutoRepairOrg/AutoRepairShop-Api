@@ -9,6 +9,7 @@ using AutoRepairShop.Domain.Enums;
 using AutoRepairShop.Domain.Exceptions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 using Moq;
 
 namespace AutoRepairShop.Tests.Controllers;
@@ -16,14 +17,13 @@ namespace AutoRepairShop.Tests.Controllers;
 public class ServiceOrderControllerTests
 {
     private readonly Mock<IServiceOrderService> _serviceMock = new();
+    private readonly Mock<ILogger<ServiceOrderController>> _loggerMock = new();
 
     [Fact]
     public async Task Create_WhenUserIdIsMissing_ShouldReturnUnauthorized()
     {
         var controller = CreateController();
-
         var result = await controller.Create(CreateRequest());
-
         var unauthorizedResult = Assert.IsType<UnauthorizedObjectResult>(result);
         Assert.Equal(
             "Invalid authenticated user.",
@@ -37,9 +37,7 @@ public class ServiceOrderControllerTests
         var userId = Guid.NewGuid();
         var request = CreateRequest();
         var controller = CreateController(userId);
-
         var result = await controller.Create(request);
-
         Assert.IsType<OkResult>(result);
         _serviceMock.Verify(
             service => service.CreateServiceOrderAsync(request, userId),
@@ -56,9 +54,7 @@ public class ServiceOrderControllerTests
             .Setup(service => service.CreateServiceOrderAsync(request, userId))
             .ThrowsAsync(new DomainException("invalid service order"));
         var controller = CreateController(userId);
-
         var result = await controller.Create(request);
-
         var badRequestResult = Assert.IsType<BadRequestObjectResult>(result);
         Assert.Equal(
             "invalid service order",
@@ -77,9 +73,7 @@ public class ServiceOrderControllerTests
         };
         _serviceMock.Setup(service => service.GetByIdAsync(serviceOrderId)).ReturnsAsync(response);
         var controller = CreateController();
-
         var result = await controller.GetStatus(serviceOrderId);
-
         var okResult = Assert.IsType<OkObjectResult>(result);
         Assert.Same(response, okResult.Value);
     }
@@ -92,9 +86,7 @@ public class ServiceOrderControllerTests
             .Setup(service => service.GetByIdAsync(serviceOrderId))
             .ThrowsAsync(new DomainException("service order not found"));
         var controller = CreateController();
-
         var result = await controller.GetStatus(serviceOrderId);
-
         var notFoundResult = Assert.IsType<NotFoundObjectResult>(result);
         Assert.Equal(
             "service order not found",
@@ -117,9 +109,7 @@ public class ServiceOrderControllerTests
             .Setup(service => service.GetAllAsync(ServiceOrderStatus.Received))
             .ReturnsAsync(response);
         var controller = CreateController();
-
         var result = await controller.GetAll(ServiceOrderStatus.Received);
-
         var okResult = Assert.IsType<OkObjectResult>(result);
         Assert.Same(response, okResult.Value);
     }
@@ -128,9 +118,7 @@ public class ServiceOrderControllerTests
     public async Task AdvanceStatus_WhenUserIdIsMissing_ShouldReturnUnauthorized()
     {
         var controller = CreateController();
-
         var result = await controller.AdvanceStatus(Guid.NewGuid());
-
         var unauthorizedResult = Assert.IsType<UnauthorizedObjectResult>(result);
         Assert.Equal(
             "Invalid authenticated user.",
@@ -144,9 +132,7 @@ public class ServiceOrderControllerTests
         var userId = Guid.NewGuid();
         var serviceOrderId = Guid.NewGuid();
         var controller = CreateController(userId);
-
         var result = await controller.AdvanceStatus(serviceOrderId);
-
         var okResult = Assert.IsType<OkObjectResult>(result);
         Assert.Equal(
             "Service order status advanced successfully.",
@@ -167,9 +153,7 @@ public class ServiceOrderControllerTests
             .Setup(service => service.AdvanceStatusAsync(serviceOrderId, userId))
             .ThrowsAsync(new DomainException("invalid transition"));
         var controller = CreateController(userId);
-
         var result = await controller.AdvanceStatus(serviceOrderId);
-
         var badRequestResult = Assert.IsType<BadRequestObjectResult>(result);
         Assert.Equal(
             "invalid transition",
@@ -186,9 +170,7 @@ public class ServiceOrderControllerTests
             ServiceIds = [Guid.NewGuid()],
             SupplyItems = [],
         };
-
         var result = await controller.UpdateInDiagnosisAndAdvance(Guid.NewGuid(), request);
-
         var unauthorizedResult = Assert.IsType<UnauthorizedObjectResult>(result);
         Assert.Equal(
             "Invalid authenticated user.",
@@ -207,9 +189,7 @@ public class ServiceOrderControllerTests
             SupplyItems = [new SupplyItemDto { SupplyId = Guid.NewGuid(), Quantity = 2 }],
         };
         var controller = CreateController(userId);
-
         var result = await controller.UpdateInDiagnosisAndAdvance(serviceOrderId, request);
-
         var okResult = Assert.IsType<OkObjectResult>(result);
         Assert.Equal(
             "Service order updated and advanced successfully.",
@@ -237,9 +217,7 @@ public class ServiceOrderControllerTests
             )
             .ThrowsAsync(new DomainException("order not in diagnosis"));
         var controller = CreateController(userId);
-
         var result = await controller.UpdateInDiagnosisAndAdvance(serviceOrderId, request);
-
         var badRequestResult = Assert.IsType<BadRequestObjectResult>(result);
         Assert.Equal(
             "order not in diagnosis",
@@ -262,9 +240,7 @@ public class ServiceOrderControllerTests
             IsApproved = isApproved,
         };
         var controller = CreateController(userId);
-
         var result = await controller.ProcessApprovalDecision(request);
-
         var okResult = Assert.IsType<OkObjectResult>(result);
         Assert.Equal(
             expectedMessage,
@@ -280,11 +256,9 @@ public class ServiceOrderControllerTests
     public async Task ProcessApprovalDecision_WhenUserIdIsMissing_ShouldReturnUnauthorized()
     {
         var controller = CreateController();
-
         var result = await controller.ProcessApprovalDecision(
             new ApprovalDecisionRequest { ServiceOrderId = Guid.NewGuid(), IsApproved = true }
         );
-
         var unauthorizedResult = Assert.IsType<UnauthorizedObjectResult>(result);
         Assert.Equal(
             "Invalid authenticated user.",
@@ -305,9 +279,7 @@ public class ServiceOrderControllerTests
             .Setup(service => service.ProcessApprovalDecisionAsync(request, userId))
             .ThrowsAsync(new DomainException("approval failed"));
         var controller = CreateController(userId);
-
         var result = await controller.ProcessApprovalDecision(request);
-
         var badRequestResult = Assert.IsType<BadRequestObjectResult>(result);
         Assert.Equal(
             "approval failed",
@@ -329,9 +301,7 @@ public class ServiceOrderControllerTests
             .Setup(service => service.GetAverageExecutionTimeAsync())
             .ReturnsAsync(response);
         var controller = CreateController();
-
         var result = await controller.GetAverageExecutionTime();
-
         var okResult = Assert.IsType<OkObjectResult>(result);
         Assert.Same(response, okResult.Value);
     }
@@ -343,9 +313,7 @@ public class ServiceOrderControllerTests
             .Setup(service => service.GetAverageExecutionTimeAsync())
             .ThrowsAsync(new DomainException("metrics unavailable"));
         var controller = CreateController();
-
         var result = await controller.GetAverageExecutionTime();
-
         var badRequestResult = Assert.IsType<BadRequestObjectResult>(result);
         Assert.Equal(
             "metrics unavailable",
@@ -355,12 +323,11 @@ public class ServiceOrderControllerTests
 
     private ServiceOrderController CreateController(Guid? userId = null)
     {
-        var controller = new ServiceOrderController(_serviceMock.Object);
+        // Única alteração: adicionado _loggerMock.Object como segundo parâmetro
+        var controller = new ServiceOrderController(_serviceMock.Object, _loggerMock.Object);
         var claims = new List<Claim>();
-
         if (userId.HasValue)
             claims.Add(new Claim(ClaimTypes.NameIdentifier, userId.Value.ToString()));
-
         controller.ControllerContext = new ControllerContext
         {
             HttpContext = new DefaultHttpContext
@@ -370,7 +337,6 @@ public class ServiceOrderControllerTests
                 ),
             },
         };
-
         return controller;
     }
 
