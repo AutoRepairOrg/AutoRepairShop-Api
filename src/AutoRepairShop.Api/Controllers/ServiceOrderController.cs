@@ -10,9 +10,10 @@ namespace AutoRepairShop.Api.Controllers
 {
     [Route("api/service-order")]
     [ApiController]
-    public class ServiceOrderController(IServiceOrderService service) : ControllerBase
+    public class ServiceOrderController(IServiceOrderService service, ILogger<ServiceOrderController> logger) : ControllerBase
     {
         private readonly IServiceOrderService _service = service;
+        private readonly ILogger<ServiceOrderController> _logger = logger;
 
         [HttpPost]
         [Authorize(Roles = "Admin")]
@@ -20,14 +21,17 @@ namespace AutoRepairShop.Api.Controllers
         {
             try
             {
+               _logger.LogInformation("Criando ordem de serviço");
                 if (!TryGetCurrentUserId(out var currentUserId))
                     return Unauthorized(new { error = "Invalid authenticated user." });
 
                 await _service.CreateServiceOrderAsync(request, currentUserId);
+                _logger.LogInformation("Ordem de serviço criada com sucesso"); 
                 return Ok();
             }
             catch (DomainException ex)
             {
+                _logger.LogError(ex, "Falha ao criar ordem de serviço");
                 return BadRequest(new { error = ex.Message });
             }
         }
