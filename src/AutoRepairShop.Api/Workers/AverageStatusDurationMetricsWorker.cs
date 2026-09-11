@@ -60,7 +60,7 @@ public class AverageStatusDurationMetricsWorker(
         dogStatsd.Gauge(ExecutionMetric, metrics.AverageInExecutionDuration.TotalSeconds);
         dogStatsd.Gauge(FinishedMetric, metrics.AverageFinishedDuration.TotalSeconds);
 
-        logger.LogDebug(
+        logger.LogWarning(
             "Published status duration metrics. Diagnosis={Diagnosis}s Execution={Execution}s Finished={Finished}s",
             metrics.AverageInDiagnosisDuration.TotalSeconds,
             metrics.AverageInExecutionDuration.TotalSeconds,
