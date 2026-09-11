@@ -16,6 +16,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Serilog;
 using Serilog.Formatting.Compact;
+using Serilog.Events;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -180,6 +181,18 @@ using (var scope = app.Services.CreateScope())
         }
     }
 }
+
+app.UseSerilogRequestLogging(options =>
+{
+    options.GetLevel = (httpContext, elapsed, ex) =>
+    {
+        if (ex != null || httpContext.Response.StatusCode >= 500)
+            return LogEventLevel.Error;
+        if (httpContext.Response.StatusCode >= 400)
+            return LogEventLevel.Warning;
+        return LogEventLevel.Information;
+    };
+});
 
 app.UseMiddleware<ExceptionMiddleware>();
 app.UseHttpsRedirection();
