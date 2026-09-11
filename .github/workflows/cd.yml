@@ -106,6 +106,26 @@ jobs:
           kubectl cluster-info
           kubectl get nodes
 
+      - name: Ensure GHCR image pull secret
+        env:
+          GHCR_USERNAME: ${{ secrets.GHCR_USERNAME }}
+          GHCR_PAT: ${{ secrets.GHCR_PAT }}
+        run: |
+          if [ -z "$GHCR_USERNAME" ] || [ -z "$GHCR_PAT" ]; then
+            echo "Missing secrets GHCR_USERNAME and/or GHCR_PAT (needs read:packages)."
+            exit 1
+          fi
+
+          kubectl -n "${{ env.K8S_NAMESPACE }}" create secret docker-registry ghcr-secret \
+            --docker-server=ghcr.io \
+            --docker-username="$GHCR_USERNAME" \
+            --docker-password="$GHCR_PAT" \
+            --docker-email="${GHCR_USERNAME}@users.noreply.github.com" \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+          kubectl -n "${{ env.K8S_NAMESPACE }}" patch deployment api --type=strategic -p \
+            '{"spec":{"template":{"spec":{"imagePullSecrets":[{"name":"ghcr-secret"}]}}}}'
+
       - name: Update API image
         run: |
           kubectl -n "${{ env.K8S_NAMESPACE }}" set image deployment/api \
