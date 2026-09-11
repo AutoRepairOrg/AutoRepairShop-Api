@@ -137,6 +137,13 @@ namespace AutoRepairShop.Api.Controllers
             }
         }
 
+        [HttpGet("metrics/average-status-durations")]
+        public async Task<IActionResult> GetAverageStatusDurations()
+        {
+            var response = await _service.GetAverageStatusDurationsAsync();
+            return Ok(response);
+        }
+
         private bool TryGetCurrentUserId(out Guid userId)
         {
             userId = Guid.Empty;

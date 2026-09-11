@@ -168,5 +168,67 @@ namespace AutoRepairShop.Infrastructure.Repositories
 
             return (total, completedCount, averageHours, earliest, latest);
         }
+
+        public async Task<(
+            TimeSpan averageInDiagnosis,
+            TimeSpan averageInExecution,
+            TimeSpan averageFinished
+        )> GetAverageStatusDurationsAsync()
+        {
+            var histories = await _context
+                .ServiceOrderHistories.AsNoTracking()
+                .Select(h => new
+                {
+                    h.ServiceOrderId,
+                    h.Status,
+                    h.CreatedAt,
+                })
+                .ToListAsync();
+
+            var byOrder = histories
+                .GroupBy(h => h.ServiceOrderId)
+                .Select(g => new
+                {
+                    ReceivedAt = g.Where(h => h.Status == ServiceOrderStatus.Received)
+                        .Min(h => (DateTime?)h.CreatedAt),
+                    InDiagnosisAt = g.Where(h => h.Status == ServiceOrderStatus.InDiagnosis)
+                        .Min(h => (DateTime?)h.CreatedAt),
+                    InExecutionAt = g.Where(h => h.Status == ServiceOrderStatus.InExecution)
+                        .Min(h => (DateTime?)h.CreatedAt),
+                    FinishedAt = g.Where(h => h.Status == ServiceOrderStatus.Finished)
+                        .Min(h => (DateTime?)h.CreatedAt),
+                })
+                .ToList();
+
+            var inDiagnosisDurations = byOrder
+                .Where(x => x.ReceivedAt.HasValue && x.InDiagnosisAt.HasValue)
+                .Select(x => x.InDiagnosisAt!.Value - x.ReceivedAt!.Value)
+                .ToList();
+
+            var inExecutionDurations = byOrder
+                .Where(x => x.InDiagnosisAt.HasValue && x.InExecutionAt.HasValue)
+                .Select(x => x.InExecutionAt!.Value - x.InDiagnosisAt!.Value)
+                .ToList();
+
+            var finishedDurations = byOrder
+                .Where(x => x.InExecutionAt.HasValue && x.FinishedAt.HasValue)
+                .Select(x => x.FinishedAt!.Value - x.InExecutionAt!.Value)
+                .ToList();
+
+            return (
+                Average(inDiagnosisDurations),
+                Average(inExecutionDurations),
+                Average(finishedDurations)
+            );
+        }
+
+        private static TimeSpan Average(List<TimeSpan> values)
+        {
+            if (values.Count == 0)
+                return TimeSpan.Zero;
+
+            var averageTicks = (long)values.Average(x => x.Ticks);
+            return TimeSpan.FromTicks(averageTicks);
+        }
     }
 }

@@ -16,5 +16,11 @@ namespace AutoRepairShop.Domain.Interfaces.Repositories
             DateTime? earliest,
             DateTime? latest
         )> GetAverageExecutionTimeAsync();
+
+        Task<(
+            TimeSpan averageInDiagnosis,
+            TimeSpan averageInExecution,
+            TimeSpan averageFinished
+        )> GetAverageStatusDurationsAsync();
     }
 }

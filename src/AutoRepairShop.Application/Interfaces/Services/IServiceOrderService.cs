@@ -23,4 +23,6 @@ public interface IServiceOrderService
     Task ProcessApprovalDecisionAsync(ApprovalDecisionRequest request, Guid changedById);
 
     Task<AverageExecutionTimeResponse> GetAverageExecutionTimeAsync();
+
+    Task<AverageStatusDurationResponse> GetAverageStatusDurationsAsync();
 }

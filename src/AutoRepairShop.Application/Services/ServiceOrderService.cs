@@ -272,6 +272,19 @@ namespace AutoRepairShop.Application.Services
             };
         }
 
+        public async Task<AverageStatusDurationResponse> GetAverageStatusDurationsAsync()
+        {
+            var (averageInDiagnosis, averageInExecution, averageFinished) =
+                await _repository.GetAverageStatusDurationsAsync();
+
+            return new AverageStatusDurationResponse
+            {
+                AverageInDiagnosisDuration = averageInDiagnosis,
+                AverageInExecutionDuration = averageInExecution,
+                AverageFinishedDuration = averageFinished,
+            };
+        }
+
         private async Task NotifyCustomerStatusChangedAsync(
             ServiceOrder serviceOrder,
             bool includeSummary = false
