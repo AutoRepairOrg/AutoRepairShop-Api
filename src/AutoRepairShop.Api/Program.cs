@@ -14,11 +14,22 @@ using AutoRepairShop.Infrastructure.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using Serilog;
+using Serilog.Formatting.Compact;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // MVC
 builder.Services.AddControllers();
+
+// Logs
+builder.Host.UseSerilog((context, services, configuration) =>
+    configuration
+        .Enrich.FromLogContext()
+        .Enrich.WithEnvironmentName()
+        .Enrich.WithThreadId()
+        .WriteTo.Console(new CompactJsonFormatter())
+);
 
 // Swagger
 builder.Services.AddEndpointsApiExplorer();
