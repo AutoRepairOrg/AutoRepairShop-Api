@@ -109,7 +109,7 @@ jobs:
       - name: Ensure GHCR image pull secret
         env:
           GHCR_USERNAME: ${{ secrets.GHCR_USERNAME }}
-          GHCR_PAT: ${{ secrets.GHCR_PAT }}
+          GHCR_PAT: ${{ secrets.GHCR_TOKEN }}
         run: |
           if [ -z "$GHCR_USERNAME" ] || [ -z "$GHCR_PAT" ]; then
             echo "Missing secrets GHCR_USERNAME and/or GHCR_PAT (needs read:packages)."
