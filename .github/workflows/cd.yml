@@ -111,7 +111,7 @@ jobs:
           kubectl -n "${{ env.K8S_NAMESPACE }}" set image deployment/api \
             api="${{ needs.publish-image.outputs.image }}"
 
-          kubectl -n "${{ env.K8S_NAMESPACE }}" rollout status deployment/api --timeout=300s
+          kubectl -n "${{ env.K8S_NAMESPACE }}" rollout status deployment/api --timeout=600s
 
       - name: Verify deployment
         run: |
