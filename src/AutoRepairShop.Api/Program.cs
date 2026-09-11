@@ -127,25 +127,71 @@ builder.Services.AddScoped<IPasswordHasher, PasswordHasher>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IJwtTokenService, JwtTokenService>();
 
-builder.Services.AddSingleton<DogStatsdService>(_ =>
+builder.Services.AddSingleton<DogStatsdService>(sp =>
 {
+    var logger = sp.GetRequiredService<ILoggerFactory>()
+        .CreateLogger("DogStatsd");
+
     var dogStatsd = new DogStatsdService();
     var env =
         Environment.GetEnvironmentVariable("DD_ENV")
         ?? Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT")
         ?? "local";
 
-    dogStatsd.Configure(
-        new StatsdConfig
-        {
-            // Uses DD_DOGSTATSD_URL / DD_AGENT_HOST when present (K8s Datadog agent).
-            ConstantTags =
-            [
-                $"env:{env.ToLowerInvariant()}",
-                "service:autorepairshop-api",
-            ],
-        }
+    var dogStatsdUrl = Environment.GetEnvironmentVariable("DD_DOGSTATSD_URL");
+    var agentHost = Environment.GetEnvironmentVariable("DD_AGENT_HOST");
+    var agentPortRaw = Environment.GetEnvironmentVariable("DD_DOGSTATSD_PORT");
+
+    var config = new StatsdConfig
+    {
+        ConstantTags =
+        [
+            $"env:{env.ToLowerInvariant()}",
+            "service:autorepairshop-api",
+        ],
+    };
+
+    // DogStatsD-CSharp-Client does not read DD_DOGSTATSD_URL by itself.
+    // In EKS the admission controller sets unix:///var/run/datadog/dsd.socket
+    if (!string.IsNullOrWhiteSpace(dogStatsdUrl))
+    {
+        config.StatsdServerName = dogStatsdUrl;
+    }
+    else if (!string.IsNullOrWhiteSpace(agentHost))
+    {
+        config.StatsdServerName = agentHost;
+        if (int.TryParse(agentPortRaw, out var port))
+            config.StatsdPort = port;
+    }
+    else
+    {
+        config.StatsdServerName = "127.0.0.1";
+        config.StatsdPort = 8125;
+    }
+
+    Exception? configureError = null;
+    var configured = dogStatsd.Configure(
+        config,
+        optionalExceptionHandler: ex => configureError = ex
     );
+
+    if (!configured)
+    {
+        logger.LogError(
+            configureError,
+            "DogStatsD configure failed. Server={Server} Port={Port}",
+            config.StatsdServerName,
+            config.StatsdPort
+        );
+    }
+    else
+    {
+        logger.LogInformation(
+            "DogStatsD configured. Server={Server} Port={Port}",
+            config.StatsdServerName,
+            config.StatsdPort
+        );
+    }
 
     return dogStatsd;
 });
