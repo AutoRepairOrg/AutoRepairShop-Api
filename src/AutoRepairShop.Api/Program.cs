@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using System.Text;
 using AutoRepairShop.Api.Middlewares;
+using AutoRepairShop.Api.Workers;
 using AutoRepairShop.Application.Interfaces;
 using AutoRepairShop.Application.Interfaces.Services;
 using AutoRepairShop.Application.Mapping;
@@ -17,6 +18,7 @@ using Microsoft.IdentityModel.Tokens;
 using Serilog;
 using Serilog.Formatting.Compact;
 using Serilog.Events;
+using StatsdClient;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -124,6 +126,31 @@ builder.Services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
 builder.Services.AddScoped<IPasswordHasher, PasswordHasher>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IJwtTokenService, JwtTokenService>();
+
+builder.Services.AddSingleton<DogStatsdService>(_ =>
+{
+    var dogStatsd = new DogStatsdService();
+    var env =
+        Environment.GetEnvironmentVariable("DD_ENV")
+        ?? Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT")
+        ?? "local";
+
+    dogStatsd.Configure(
+        new StatsdConfig
+        {
+            // Uses DD_DOGSTATSD_URL / DD_AGENT_HOST when present (K8s Datadog agent).
+            ConstantTags =
+            [
+                $"env:{env.ToLowerInvariant()}",
+                "service:autorepairshop-api",
+            ],
+        }
+    );
+
+    return dogStatsd;
+});
+builder.Services.AddSingleton<IDogStatsd>(sp => sp.GetRequiredService<DogStatsdService>());
+builder.Services.AddHostedService<AverageStatusDurationMetricsWorker>();
 
 //Auth
 var jwtKey =
