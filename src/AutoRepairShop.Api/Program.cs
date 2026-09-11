@@ -189,6 +189,8 @@ app.UseSerilogRequestLogging(options =>
         if (ex != null || httpContext.Response.StatusCode >= 500)
             return LogEventLevel.Error;
         if (httpContext.Response.StatusCode >= 400)
+            return LogEventLevel.Error;
+        if (httpContext.Response.StatusCode >= 300)
             return LogEventLevel.Warning;
         return LogEventLevel.Information;
     };
